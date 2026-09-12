@@ -1,0 +1,19 @@
+# Build output
+build/
+dist/
+*.spec.bak
+__pycache__/
+*.pyc
+*.log
+
+# The upscaling engine and its models are third-party redistributables, not our
+# source. Get them with tools/fetch_engine.py (or from the release zip). They
+# live in ./upscaler/ next to the program.
+upscaler/
+
+# Staged releases (the exe + engine bundle) are attached to GitHub Releases,
+# not committed to the repo.
+Releases/
+
+# Sample/comparison images made from game textures are never committed.
+Model Comparisons/

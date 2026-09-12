@@ -1,0 +1,6 @@
+# Runtime dependency for the source app. The built exe bundles this.
+# The GUI uses Tkinter, which ships with the standard CPython installer.
+Pillow>=10.0
+
+# Build-time only (to produce the portable exe with build_portable.cmd):
+#   pyinstaller>=6.0
