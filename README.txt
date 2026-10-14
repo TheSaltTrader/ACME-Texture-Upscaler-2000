@@ -68,7 +68,11 @@ Command line
 
   ACMETextureUpscaler2000.exe --cli <input> <output> [--scale 4] [--model name]
       [--strength 0-100] [--sort-only] [--no-sort] [--no-ocr] [--no-sheets]
-      [--kept copy|plain|omit] [--png] [--log file]
+      [--kept copy|plain|omit] [--lowq jpeg|same] [--png] [--redo]
+      [--log file]
+
+  Files already in the output folder are skipped (a cancelled run resumes);
+  --redo makes them again.
 
 
 Notes
@@ -76,4 +80,5 @@ Notes
 
 Upscaling runs on the GPU (Vulkan); do not run it while a game is using the GPU
 (outputs can come back blank - they are caught and redone, but it is slow).
-DDS is written back as uncompressed RGBA. Licences: THIRD_PARTY_NOTICES.txt.
+DDS is written back as uncompressed RGBA. Changes per version: CHANGELOG.md
+(in the source repository). Licences: THIRD_PARTY_NOTICES.txt.

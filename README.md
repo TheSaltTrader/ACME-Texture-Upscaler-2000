@@ -1,5 +1,7 @@
 # ACME Texture Upscaler 2000
 
+Version **1.1.0** (released 2026-10-13). What changed: [CHANGELOG.md](CHANGELOG.md).
+
 A portable AI texture upscaler for Windows. Point it at a folder, choose a scale,
 press **Start**. Before anything reaches the AI, every image is **sorted**: texture
 art goes to the AI, lettering gets a sharp resize, and the kinds of image an AI
@@ -20,7 +22,9 @@ installed. Keep the `upscaler` folder next to the program (the engine and models
 2. Pick a scale: 2x / 3x / 4x / 8x.
 3. **Scan and sort**, look at the summary (and the contact sheets), then **Start**.
 
-Progress, elapsed time, an ETA and **Cancel** are shown while it works. **Open
+Progress, elapsed time, an ETA and **Cancel** are shown while it works. Files already
+in the output folder are skipped, so a cancelled run resumes where it stopped;
+**Extra quality (slow)** runs the engine's TTA mode. **Open
 report** opens `_acme_report\` in the output folder: `report.csv` (one line per
 image: class, reason, measurements, result, warnings), `summary.txt`, and
 `sheets\<class>_NN.png` contact sheets.
@@ -94,8 +98,10 @@ model (`.param` + `.bin`) dropped into `upscaler\models` is listed too.
 ```
 ACMETextureUpscaler2000.exe --cli <input> <output> [--scale 4] [--model <name>]
     [--strength 0-100] [--sort-only] [--no-sort] [--no-ocr] [--no-sheets]
-    [--kept copy|plain|omit] [--lowq jpeg|same] [--png] [--log <file>]
+    [--kept copy|plain|omit] [--lowq jpeg|same] [--png] [--redo] [--log <file>]
 ```
+
+`--redo` re-makes files already in the output folder (by default they are skipped).
 
 ## Formats
 
