@@ -1,104 +1,135 @@
 # ACME Texture Upscaler 2000
 
-A portable AI texture upscaler for Windows. Point it at a folder, choose a model
-and a scale, press **Start**. Every image it finds is enlarged with an AI
-upscaler and written to an output folder with the sub-folder tree preserved.
+A portable AI texture upscaler for Windows. Point it at a folder, choose a scale,
+press **Start**. Before anything reaches the AI, every image is **sorted**: texture
+art goes to the AI, lettering gets a sharp resize, and the kinds of image an AI
+upscaler damages (soft glows, lighting and data textures, tiny images, unsure
+lettering) keep the original. A report says what happened to every file and why.
 
-It is built for game and mod texture packs: it reads the formats textures ship
-in (including DDS and TGA), keeps the folder layout, and gives you a detail
-control so a model that over-sharpens can be dialed back. It is the same
-upscaling pipeline used to build the Ninja Gaiden II recompile texture pack,
-packaged as a standalone tool.
+The rules come from the texture packs of several game PC ports (Hulk, Ninja Gaiden
+II, Ninja Gaiden Black, Fable II, Bloodborne, Def Jam), where each one was found
+the hard way and tuned on contact sheets of real textures.
 
 ## Download and run
 
-The ready-to-run build is on the [Releases page](../../releases). Download the
-`...-win-amd64.zip`, unzip it anywhere, and run `ACMETextureUpscaler2000.exe`.
-Nothing is installed. Keep the `upscaler` folder next to the program — that is
-the engine and its models.
+The ready-to-run build is on the [Releases page](../../releases). Unzip the
+`...-win-amd64.zip` anywhere and run `ACMETextureUpscaler2000.exe`. Nothing is
+installed. Keep the `upscaler` folder next to the program (the engine and models).
 
-1. Browse to the folder of textures.
-2. It fills in an output folder for you (`<folder>_upscaled`); change it if you like.
-3. Pick a model and a scale (2x / 3x / 4x).
-4. **Scan folder**, then **Start**.
+1. Browse to the folder of textures (an output folder `<folder>_upscaled` is filled in).
+2. Pick a scale: 2x / 3x / 4x / 8x.
+3. **Scan and sort**, look at the summary (and the contact sheets), then **Start**.
 
-A progress bar, a running count, elapsed time and a time-remaining estimate are
-shown while it works. **Cancel** stops after the current image. **Open output**
-opens the result folder.
+Progress, elapsed time, an ETA and **Cancel** are shown while it works. **Open
+report** opens `_acme_report\` in the output folder: `report.csv` (one line per
+image: class, reason, measurements, result, warnings), `summary.txt`, and
+`sheets\<class>_NN.png` contact sheets.
 
-## Features
+## How images are sorted
 
-- **Any texture format in a pack.** PNG, JPG/JPEG and WebP go straight through
-  the engine; BMP, TGA, TIFF and DDS are decoded first and written back in their
-  own format where possible, otherwise as PNG.
-- **2x / 3x / 4x** scaling.
-- **Multiple models,** selectable per run — see below.
-- **Detail-strength slider.** Blends the AI result with a plain enlargement of
-  the same texture. 100% is pure AI (the default); 0% is a plain resize with no
-  AI; anywhere in between is a mix, so a model that over-sharpens or invents
-  detail can be reined in. This is the same control the Ninja Gaiden II pack
-  uses, so a value here matches that pack at the same setting.
-- **Progress + ETA,** a running count, and a per-image log.
-- **Recursive** folder walking, **skip-existing** resume, and an optional
-  **Extra quality (slow)** TTA mode.
-- **Fully portable.** No install, no admin, no network needed to upscale.
+| Class | What it catches | What it gets |
+| --- | --- | --- |
+| **Art** | everything not below | the AI model |
+| **Normal map** | means near 128/128 with high blue and unit-length vectors, a BC5/ATI2 DDS, or a name hint (`_n`, `_nrm`, `_normal`, `_ddna`...) | the AI's added detail over a plain resize (means stay put), then renormalised (Z rebuilt, or kept at 255 where the source's blue is constant); never colour-processed |
+| **Low quality** | heavy JPEG blocking: 8x8 block-edge step / mid-block step > 1.8 in a .jpg (> 2.6 in other files) | Real-ESRGAN x4plus (trained on JPEG damage) instead of the texture model |
+| **Lettering** | Windows OCR reads a real word (several sizes, grey, inverted, rotated reads) | sharp resize (bicubic + light unsharp mask), never AI |
+| **Possible lettering** | OCR finds letter-like shapes but no sure word | original kept; 512 px and larger (usually atlases of small tiles) get the sharp resize |
+| **Soft / blurry** | detail ratio < 0.003 at any size; glow sprites (<= 256 px, dark border, peak >= 50, detail < 0.015); small glows (<= 64 px, detail < 0.04) | original kept |
+| **Lighting / data** | name hints (`lightmap`, `_lm`, `_light`, `_shadow`, `lut`, `ramp`, `gi_env`, `env`, `refl`, `cube`, `noise`, `dither`...), long strips (aspect >= 8), flat fills (spread < 1.5), blank images, white noise / dither patterns, single-channel and HDR DDS formats (BC4, BC6H, R8, A8, float) | original kept |
+| **Tiny** | under 32 px on a side | original kept |
+| **Too large** | already so big that even 2x would pass 4096 px | original kept |
+
+*Detail ratio* = the error of a 2x shrink-and-enlarge relative to the image's
+variance (alpha-weighted; the Hulk port's soft test). Every threshold is editable
+under **Advanced**, where you can also choose what kept images get (copy the
+original, plain resize, or leave them out), switch the OCR or name hints off, and
+turn contact sheets off. After the AI, a result that added grain to a smooth
+source (high-frequency ratio > 0.8 on a source with detail < 0.05) is rejected and
+the original kept.
+
+**Your own lists win:** `acme_keep.txt`, `acme_sharp.txt` and `acme_ai.txt` in the
+input folder, one file name, relative path or pattern (`*.tga`) per line.
+
+Without Windows OCR (or with it switched off) a two-tone stroke heuristic can only
+mark *possible* lettering, which keeps the original.
+
+## Quality rules
+
+- **NMKD Superscale** is the default model: it keeps texture detail where the
+  photo model x4plus smears stone and carving and shifts brightness. For photo
+  models the **Detail strength** slider defaults to 75%: the AI's high-pass laid
+  over a plain resize, so tones and brightness stay the original's.
+- 4x networks always run at 4x and are shrunk with an area (FANT-style) filter for
+  2x / 3x (asked for 2x directly they draw shifted ghost edges). **8x** = two 4x
+  passes, then halved. Nothing goes over **4096 px**: an image that would takes
+  the next smaller scale.
+- **Alpha never goes through the AI.** Colour and alpha are resized apart (an
+  RGBA resize premultiplies and writes black under transparent pixels), and a
+  cut-out (alpha only 0/255) is re-thresholded at 50% so its edge stays clean.
+- **Every AI output is checked**: right size, not blank (a lost Vulkan device
+  writes blanks), and shrunk back it still matches the source (mean difference
+  <= 25 of 255). A failure is redone alone, then falls back to a plain resize.
+  Channel means are compared with the source; a shift over 8 levels is flagged in
+  the report.
+- **Batches of 64** per engine run (starting the engine costs ~2 s an image when
+  run singly), with the CPU preparing the next batch and finishing the last while
+  the GPU works; a run that writes nothing for 5 minutes is ended. Inputs under
+  16 px never go to the AI.
 
 ## Models
 
-Ships with **Real-ESRGAN** and lists whatever models are installed:
-
 | Model | Best for |
 | --- | --- |
-| Photo 4x — `x4plus` | The general, widely-used default. Recommended for most textures. Sharpest; occasionally invents detail. |
-| Soft 4x — `net` | Fewer artifacts, more faithful, a touch softer. Fetch with "Get more models". |
-| Art 4x — `x4plus-anime` | Tuned for drawn / cel art. |
-| Fast 2x/3x/4x — anime video | Quickest and lightest; good for large batches. |
+| Texture 4x - **NMKD Superscale** (default) | game and material textures |
+| Photo 4x - `x4plus` | photos and JPEG-damaged images (used for the Low-quality class) |
+| Art 4x - `x4plus-anime` | drawn / cel art |
+| Fast 2x/3x/4x - anime video v3 | quick, light |
 
-**Get more models...** inside the app can fetch two other portable engines and
-add them to the same list:
+**Get more models...** fetches Real-CUGAN (precise on drawn and game art, has a
+denoise level) and waifu2x from their official release pages. Any other ncnn
+model (`.param` + `.bin`) dropped into `upscaler\models` is listed too.
 
-- **Real-CUGAN** — often the most precise on drawn and game art: better detail
-  preservation and less over-sharpening than Real-ESRGAN. Has a denoise level.
-- **waifu2x** — clean line art and gentle denoise.
+## Command line
 
-There is no single best model for every texture; the selector is there so you
-can compare on your own art. Start with Photo 4x (`x4plus`); if it looks
-over-sharpened or "painted", try Real-CUGAN, Soft 4x, or lower the detail slider.
+```
+ACMETextureUpscaler2000.exe --cli <input> <output> [--scale 4] [--model <name>]
+    [--strength 0-100] [--sort-only] [--no-sort] [--no-ocr] [--no-sheets]
+    [--kept copy|plain|omit] [--lowq jpeg|same] [--png] [--log <file>]
+```
+
+## Formats
+
+PNG, JPG, WebP, BMP, TGA, TIFF and DDS in; written back in the same format where
+Pillow can write it (DDS as uncompressed RGBA), otherwise PNG ("Keep original
+format" off = PNG for everything).
 
 ## Run from source
 
-Needs Python 3.10+ with Tkinter (the standard Windows installer includes it).
+Python 3.10+ with Tkinter.
 
 ```
 pip install -r requirements.txt
-python tools/fetch_engine.py      # downloads the Real-ESRGAN engine into ./upscaler/
+python tools/fetch_engine.py      # Real-ESRGAN engine + models + NMKD Superscale into ./upscaler/
 python acme_upscaler.py           # or run.cmd
 ```
 
-`tools/fetch_engine.py` pulls the official portable Real-ESRGAN Windows build
-(the engine binaries and default models are third-party redistributables, so
-they are not committed here). The in-app "Get more models" button adds
-Real-CUGAN and waifu2x the same way.
-
-## Build the portable exe
+## Build
 
 ```
-build_portable.cmd     # PyInstaller one-file build -> dist\ACMETextureUpscaler2000.exe
-python stage_release.py  # bundles exe + upscaler engine into Releases\vX.Y.Z + a zip
+build_portable.cmd     # PyInstaller one-file exe, then stage_release.py -> Releases\vX.Y.Z + zip
 ```
-
-Bump `VERSION` before building.
 
 ## What is in this repository
 
-Source only: the application, the build and release scripts, and this
-documentation. The upscaling engines (Real-ESRGAN, Real-CUGAN, waifu2x) are
-third-party redistributables and are provided in the release zip, not committed
-here. Sample and comparison images made from game textures are never included.
+Source only. The engine and model files are third-party and come with the
+release zip (or `tools/fetch_engine.py`). No game textures, sample images or
+comparison images are included.
 
-## Credits and license
+## Credits and licences
 
-This program is a front-end. The upscaling engines are **Real-ESRGAN**,
-**Real-CUGAN** and **waifu2x**, each by their respective authors, distributed
-under their own licenses. This front-end is released under the MIT License
-(see [LICENSE](LICENSE)).
+This front-end is MIT licensed ([LICENSE](LICENSE)). The release zip carries
+Real-ESRGAN models (BSD 3-Clause), Real-ESRGAN ncnn Vulkan (MIT), ncnn (BSD
+3-Clause) and **4x_NMKD-Superscale-SP_178000_G by Nmkd (WTFPL**, per the Open
+Model Database; ncnn conversion from upscayl/custom-models). Full texts:
+[THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt). Lettering detection uses
+Windows' built-in OCR; nothing is shipped for it.

@@ -26,11 +26,24 @@ def main():
     if not os.path.isfile(exe):
         raise SystemExit("build the exe first (build_portable.cmd)")
     shutil.copy2(exe, os.path.join(dest, "ACMETextureUpscaler2000.exe"))
-    shutil.copy2(os.path.join(HERE, "README.txt"), os.path.join(dest, "README.txt"))
+    for doc in ("README.txt", "THIRD_PARTY_NOTICES.txt", "LICENSE"):
+        shutil.copy2(os.path.join(HERE, doc), os.path.join(dest, doc))
 
     # The engine + models, external so the app finds them beside the exe.
+    # (only the bundled engine; never a downloaded Real-CUGAN / waifu2x)
     src_up = os.path.join(HERE, "upscaler")
-    shutil.copytree(src_up, os.path.join(dest, "upscaler"))
+    need = ["realesrgan-ncnn-vulkan.exe", "vcomp140.dll"]
+    models = ["realesrgan-x4plus", "realesrgan-x4plus-anime", "realesr-animevideov3-x2",
+              "realesr-animevideov3-x3", "realesr-animevideov3-x4", "4x_NMKD-Superscale-SP_178000_G"]
+    os.makedirs(os.path.join(dest, "upscaler", "models"))
+    for n in need:
+        shutil.copy2(os.path.join(src_up, n), os.path.join(dest, "upscaler", n))
+    for m in models:
+        for ext in (".param", ".bin"):
+            p = os.path.join(src_up, "models", m + ext)
+            if not os.path.isfile(p):
+                raise SystemExit("missing model file %s (python tools/fetch_engine.py)" % p)
+            shutil.copy2(p, os.path.join(dest, "upscaler", "models", m + ext))
 
     files = []
     total = 0

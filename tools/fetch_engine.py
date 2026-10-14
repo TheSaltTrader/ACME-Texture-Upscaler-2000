@@ -10,7 +10,9 @@ It fetches the official portable Real-ESRGAN Windows build (executable + the
 default model set + vcomp140.dll) and lays it out as ./upscaler/, which is
 exactly where the app looks. The Real-CUGAN and waifu2x engines can be added
 later from inside the app ("Get more models..."); this script only bootstraps
-the bundled Real-ESRGAN engine.
+the bundled Real-ESRGAN engine, plus the NMKD Superscale texture model (WTFPL,
+by Nmkd; the ncnn conversion published in github.com/upscayl/custom-models,
+pinned to a commit and checked by size).
 """
 import os
 import shutil
@@ -25,13 +27,36 @@ URL = ("https://github.com/xinntao/Real-ESRGAN/releases/download/"
        "v0.2.5.0/realesrgan-ncnn-vulkan-20220424-windows.zip")
 ENGINE_EXE = "realesrgan-ncnn-vulkan.exe"
 
+# NMKD Superscale (the default texture model), pinned commit of upscayl/custom-models.
+SUPERSCALE = "4x_NMKD-Superscale-SP_178000_G"
+SUPERSCALE_BASE = ("https://raw.githubusercontent.com/upscayl/custom-models/"
+                   "4b6d2cfa59c7442af115dfc6e50fd8d7d40b96ef/models/")
+SUPERSCALE_SIZES = {".bin": 66793352, ".param": 108037}
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEST = os.path.join(os.path.dirname(HERE), "upscaler")
 
 
+def fetch_superscale():
+    mdir = os.path.join(DEST, "models")
+    os.makedirs(mdir, exist_ok=True)
+    for ext, size in SUPERSCALE_SIZES.items():
+        dst = os.path.join(mdir, SUPERSCALE + ext)
+        if os.path.isfile(dst) and os.path.getsize(dst) == size:
+            continue
+        print("downloading %s%s" % (SUPERSCALE, ext))
+        tmp = dst + ".part"
+        urllib.request.urlretrieve(SUPERSCALE_BASE + SUPERSCALE + ext, tmp)
+        if os.path.getsize(tmp) != size:
+            os.remove(tmp)
+            raise SystemExit("%s%s: unexpected size" % (SUPERSCALE, ext))
+        os.replace(tmp, dst)
+
+
 def main():
     if os.path.isfile(os.path.join(DEST, ENGINE_EXE)):
-        print("engine already present at %s - nothing to do" % DEST)
+        print("engine already present at %s" % DEST)
+        fetch_superscale()
         return
     with tempfile.TemporaryDirectory() as td:
         zpath = os.path.join(td, "engine.zip")
@@ -64,6 +89,7 @@ def main():
                 shutil.copytree(s, d, dirs_exist_ok=True)
             else:
                 shutil.copy2(s, d)
+    fetch_superscale()
     print("installed engine + models to %s" % DEST)
 
 
